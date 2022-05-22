@@ -1,0 +1,18 @@
+image: docker:latest
+
+services:
+  - docker:dind
+
+build-delivery:
+  variables:
+    RELEASE_TAG: docker_buildx_${CI_COMMIT_REF_SLUG}
+  script:
+    - 'echo "${DOCKER_PASSWORD}" | docker login --username "${DOCKER_USERNAME}" --password-stdin'
+    - 'docker build --pull --no-cache --rm --tag "${DOCKER_REPOSITORY}:${RELEASE_TAG}_local" --file Dockerfile .'
+    - 'PLATFORM=$(docker image inspect riccardocampisano/public:docker_buildx_master_local --format "{{.Os}}_{{.Architecture}}{{if .Variant}}_{{.Variant}}{{end}}")'
+    - 'docker image tag "${DOCKER_REPOSITORY}:${RELEASE_TAG}_local" "${DOCKER_REPOSITORY}:${RELEASE_TAG}_${PLATFORM}"'
+    - 'docker push "${DOCKER_REPOSITORY}:${RELEASE_TAG}_${PLATFORM}"'
+    - 'docker manifest create "${DOCKER_REPOSITORY}:${RELEASE_TAG}" --amend "${DOCKER_REPOSITORY}:${RELEASE_TAG}_linux_amd64" --amend "${DOCKER_REPOSITORY}:${RELEASE_TAG}_linux_arm64_v8"'
+    - 'docker manifest push "${DOCKER_REPOSITORY}:${RELEASE_TAG}"'
+  except:
+    - tags
